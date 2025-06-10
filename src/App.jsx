@@ -1,22 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 function App() {
   const [keyword, setKeyword] = useState("");
   const [keywords, setKeywords] = useState([]);
   const [results, setResults] = useState([]);
+  const [isAutoChecking, setIsAutoChecking] = useState(true);
 
-  const addKeyword = () => {
-    if (keyword.trim() && !keywords.includes(keyword.trim())) {
-      setKeywords([...keywords, keyword.trim()]);
+  const checkKeywords = useCallback(async () => {
+    if (keywords.length === 0) {
+      setResults([]);
+      return;
     }
-    setKeyword("");
-  };
 
-  const removeKeyword = (kw) => {
-    setKeywords(keywords.filter((k) => k !== kw));
-  };
-
-  const checkKeywords = async () => {
     try {
       // Get the active tab
       const [tab] = await chrome.tabs.query({
@@ -79,6 +74,149 @@ function App() {
       console.error("Error checking keywords:", error);
       setResults([`Error: ${error.message}`]);
     }
+  }, [keywords]);
+
+  // Auto-check when keywords change
+  useEffect(() => {
+    if (isAutoChecking) {
+      checkKeywords();
+    }
+  }, [keywords, checkKeywords, isAutoChecking]);
+
+  // Set up tab change listener
+  useEffect(() => {
+    if (!isAutoChecking) return;
+
+    const handleTabUpdate = (tabId, changeInfo, tab) => {
+      // Check when tab is completely loaded
+      if (changeInfo.status === "complete") {
+        // Add a small delay to ensure content is fully loaded
+        setTimeout(() => {
+          checkKeywords();
+        }, 1000);
+      }
+    };
+
+    const handleTabActivated = (activeInfo) => {
+      // Check when switching to a different tab
+      setTimeout(() => {
+        checkKeywords();
+      }, 500);
+    };
+
+    // Add listeners
+    chrome.tabs.onUpdated.addListener(handleTabUpdate);
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+
+    // Cleanup listeners on unmount
+    return () => {
+      chrome.tabs.onUpdated.removeListener(handleTabUpdate);
+      chrome.tabs.onActivated.removeListener(handleTabActivated);
+    };
+  }, [checkKeywords, isAutoChecking]);
+
+  // Set up content change monitoring
+  useEffect(() => {
+    if (!isAutoChecking) return;
+
+    const monitorContentChanges = async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+
+        if (
+          !tab ||
+          tab.url.startsWith("chrome://") ||
+          tab.url.startsWith("chrome-extension://") ||
+          tab.url.startsWith("edge://") ||
+          tab.url.startsWith("about:")
+        ) {
+          return;
+        }
+
+        // Inject script to monitor content changes
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          function: () => {
+            // Remove existing observer if any
+            if (window.keywordCheckerObserver) {
+              window.keywordCheckerObserver.disconnect();
+            }
+
+            const targetElement = document.querySelector(
+              ".jobs-description-content__text--stretch"
+            );
+
+            if (targetElement) {
+              // Create a MutationObserver to watch for content changes
+              window.keywordCheckerObserver = new MutationObserver(
+                (mutations) => {
+                  let contentChanged = false;
+                  mutations.forEach((mutation) => {
+                    if (
+                      mutation.type === "childList" ||
+                      mutation.type === "characterData"
+                    ) {
+                      contentChanged = true;
+                    }
+                  });
+
+                  if (contentChanged) {
+                    // Send message to extension popup
+                    chrome.runtime
+                      .sendMessage({
+                        action: "contentChanged",
+                      })
+                      .catch(() => {
+                        // Ignore errors if popup is not open
+                      });
+                  }
+                }
+              );
+
+              // Start observing
+              window.keywordCheckerObserver.observe(targetElement, {
+                childList: true,
+                subtree: true,
+                characterData: true,
+              });
+            }
+          },
+        });
+      } catch (error) {
+        console.error("Error setting up content monitoring:", error);
+      }
+    };
+
+    monitorContentChanges();
+
+    // Set up message listener for content changes
+    const handleMessage = (message, sender, sendResponse) => {
+      if (message.action === "contentChanged") {
+        setTimeout(() => {
+          checkKeywords();
+        }, 500);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [checkKeywords, isAutoChecking]);
+
+  const addKeyword = () => {
+    if (keyword.trim() && !keywords.includes(keyword.trim())) {
+      setKeywords([...keywords, keyword.trim()]);
+    }
+    setKeyword("");
+  };
+
+  const removeKeyword = (kw) => {
+    setKeywords(keywords.filter((k) => k !== kw));
   };
 
   // Handle Enter key in input
@@ -93,6 +231,20 @@ function App() {
       <h1 className="text-2xl font-bold mb-4 text-blue-400">
         Job Keyword Checker
       </h1>
+
+      <div className="flex items-center mb-4">
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isAutoChecking}
+            onChange={(e) => setIsAutoChecking(e.target.checked)}
+            className="mr-2"
+          />
+          <span className="text-sm text-gray-300">
+            Auto-check on page/content changes
+          </span>
+        </label>
+      </div>
 
       <div className="flex mb-4">
         <input
@@ -137,8 +289,14 @@ function App() {
             : "bg-blue-600 hover:bg-blue-700"
         }`}
       >
-        Check Keywords in Current Tab
+        {isAutoChecking ? "Manual Check" : "Check Keywords in Current Tab"}
       </button>
+
+      {isAutoChecking && (
+        <p className="text-sm text-green-400 mt-2">
+          ✓ Auto-checking enabled - keywords will be checked automatically
+        </p>
+      )}
 
       <div className="mt-6" id="result">
         {results.map((res, index) => (
