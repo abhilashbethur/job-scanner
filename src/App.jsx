@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+  getKeywordsFromLocalStorage,
+  setKeywordsToLocalStorage,
+} from "./utils/utils";
 
 function App() {
   const [keyword, setKeyword] = useState("");
-  const [keywords, setKeywords] = useState([]);
+  const [keywords, setKeywords] = useState(getKeywordsFromLocalStorage() || []);
   const [results, setResults] = useState([]);
   const [isAutoChecking, setIsAutoChecking] = useState(true);
 
@@ -210,13 +214,17 @@ function App() {
 
   const addKeyword = () => {
     if (keyword.trim() && !keywords.includes(keyword.trim())) {
-      setKeywords([...keywords, keyword.trim()]);
+      const updatedKeywords = [...keywords, keyword.trim()];
+      setKeywordsToLocalStorage(updatedKeywords);
+      setKeywords(updatedKeywords);
     }
     setKeyword("");
   };
 
   const removeKeyword = (kw) => {
-    setKeywords(keywords.filter((k) => k !== kw));
+    const updatedKeywords = keywords.filter((k) => k !== kw);
+    setKeywordsToLocalStorage(updatedKeywords);
+    setKeywords(updatedKeywords);
   };
 
   // Handle Enter key in input
@@ -228,7 +236,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6 font-sans">
-      <h1 className="text-2xl font-bold mb-4 text-blue-400">
+      <h1 className="text-3xl font-bold mb-6 text-blue-400">
         Job Keyword Checker
       </h1>
 
@@ -240,7 +248,7 @@ function App() {
             onChange={(e) => setIsAutoChecking(e.target.checked)}
             className="mr-2"
           />
-          <span className="text-sm text-gray-300">
+          <span className="text-base text-gray-300">
             Auto-check on page/content changes
           </span>
         </label>
@@ -253,11 +261,11 @@ function App() {
           onChange={(e) => setKeyword(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Enter keywords (e.g., relocation, visa support)"
-          className="w-full p-3 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400"
+          className="w-full p-3 bg-gray-800 border border-gray-700 rounded text-base text-white placeholder-gray-400"
         />
         <button
           onClick={addKeyword}
-          className="ml-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white"
+          className="ml-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-base text-white"
         >
           Add
         </button>
@@ -267,12 +275,12 @@ function App() {
         {keywords.map((kw) => (
           <span
             key={kw}
-            className="bg-blue-500 text-white px-3 py-1 rounded-full flex items-center"
+            className="bg-blue-500 text-white px-3 py-1 rounded-full flex items-center text-base"
           >
             {kw}
             <button
               onClick={() => removeKeyword(kw)}
-              className="ml-2 text-white font-bold"
+              className="ml-2 text-white font-bold text-lg"
             >
               ×
             </button>
@@ -283,7 +291,7 @@ function App() {
       <button
         onClick={checkKeywords}
         disabled={keywords.length === 0}
-        className={`px-4 py-2 rounded text-white ${
+        className={`px-4 py-2 rounded text-base text-white ${
           keywords.length === 0
             ? "bg-gray-600 cursor-not-allowed"
             : "bg-blue-600 hover:bg-blue-700"
@@ -293,14 +301,14 @@ function App() {
       </button>
 
       {isAutoChecking && (
-        <p className="text-sm text-green-400 mt-2">
+        <p className="text-base text-green-400 mt-2">
           ✓ Auto-checking enabled - keywords will be checked automatically
         </p>
       )}
 
       <div className="mt-6" id="result">
         {results.map((res, index) => (
-          <p key={index} className="mb-2 p-2 bg-gray-800 rounded">
+          <p key={index} className="mb-2 p-2 bg-gray-800 rounded text-lg">
             {res}
           </p>
         ))}
