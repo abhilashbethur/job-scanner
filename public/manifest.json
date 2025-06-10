@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "version": "1.0.0",
+  "name": "Job Keyword Checker",
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Job Keyword Checker"
+  },
+  "permissions": ["scripting", "sidePanel", "tabs", "activeTab"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
