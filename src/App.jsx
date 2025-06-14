@@ -320,7 +320,7 @@ function App() {
           </p>
         )}
       </div>
-      {results.length && (
+      {results.length && !error ? (
         <div className="mt-6" id="result">
           {results.map((res, index) => (
             <p
@@ -335,6 +335,8 @@ function App() {
             </p>
           ))}
         </div>
+      ) : (
+        <></>
       )}
     </div>
   );
