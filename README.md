@@ -83,8 +83,3 @@ npm run build
 
 Pull requests are welcome. For major changes, open an issue first to discuss what you would like to change or improve.
 
----
-
-## 📜 License
-
-[MIT](LICENSE)
