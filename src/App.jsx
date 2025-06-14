@@ -1,3 +1,4 @@
+/* global chrome */
 import { useState, useEffect, useCallback } from "react";
 import {
   getKeywordsFromLocalStorage,
@@ -9,10 +10,12 @@ function App() {
   const [keywords, setKeywords] = useState(getKeywordsFromLocalStorage() || []);
   const [results, setResults] = useState([]);
   const [isAutoChecking, setIsAutoChecking] = useState(true);
+  const [error, setError] = useState("");
 
   const checkKeywords = useCallback(async () => {
     if (keywords.length === 0) {
       setResults([]);
+      setError("Please add some keywords to check.");
       return;
     }
 
@@ -24,7 +27,7 @@ function App() {
       });
 
       if (!tab) {
-        setResults(["Unable to access current tab."]);
+        setError("No active tab found.");
         return;
       }
 
@@ -35,9 +38,9 @@ function App() {
         tab.url.startsWith("edge://") ||
         tab.url.startsWith("about:")
       ) {
-        setResults([
-          "Cannot access this type of page. Please navigate to a regular website.",
-        ]);
+        setError(
+          "Cannot access this type of page. Please navigate to a regular website."
+        );
         return;
       }
 
@@ -63,20 +66,24 @@ function App() {
       const result = injectionResults[0].result;
 
       if (result.error) {
-        setResults([result.error]);
+        setError(result.error);
         return;
       }
 
       const jobText = result.jobText.toLowerCase();
       const found = keywords.map((kw) =>
         jobText.includes(kw.toLowerCase())
-          ? `✅ ${kw} found`
-          : `❌ ${kw} not found`
+          ? { kw, found: true }
+          : // `❌ ${kw} not found`
+            { kw, found: false }
       );
       setResults(found);
+      setError(""); // Clear any previous errors
     } catch (error) {
       console.error("Error checking keywords:", error);
-      setResults([`Error: ${error.message}`]);
+      setError(
+        "An error occurred while checking keywords. Error: " + error.message
+      );
     }
   }, [keywords]);
 
@@ -91,7 +98,7 @@ function App() {
   useEffect(() => {
     if (!isAutoChecking) return;
 
-    const handleTabUpdate = (tabId, changeInfo, tab) => {
+    const handleTabUpdate = (tabId, changeInfo) => {
       // Check when tab is completely loaded
       if (changeInfo.status === "complete") {
         // Add a small delay to ensure content is fully loaded
@@ -101,7 +108,7 @@ function App() {
       }
     };
 
-    const handleTabActivated = (activeInfo) => {
+    const handleTabActivated = (_activeInfo) => {
       // Check when switching to a different tab
       setTimeout(() => {
         checkKeywords();
@@ -197,7 +204,7 @@ function App() {
     monitorContentChanges();
 
     // Set up message listener for content changes
-    const handleMessage = (message, sender, sendResponse) => {
+    const handleMessage = (message, _sender, _sendResponse) => {
       if (message.action === "contentChanged") {
         setTimeout(() => {
           checkKeywords();
@@ -305,14 +312,30 @@ function App() {
           ✓ Auto-checking enabled - keywords will be checked automatically
         </p>
       )}
-
-      <div className="mt-6" id="result">
-        {results.map((res, index) => (
-          <p key={index} className="mb-2 p-2 bg-gray-800 rounded text-lg">
-            {res}
+      <div className="mt-4">
+        {error && <p className="text-red-500 text-lg mb-4">Error: {error}</p>}
+        {!error && results.length === 0 && (
+          <p className="text-gray-400 text-lg">
+            No results yet. Add keywords and check them!
           </p>
-        ))}
+        )}
       </div>
+      {results.length && (
+        <div className="mt-6" id="result">
+          {results.map((res, index) => (
+            <p
+              key={index}
+              className={`mb-2 p-2 bg-gray-800 rounded text-lg ${
+                res.found
+                  ? "border-1 border-amber-300 bg-green-500"
+                  : "border-0"
+              }`}
+            >
+              {res.found ? `✅ ${res.kw} found` : `❌ ${res.kw} not found`}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
